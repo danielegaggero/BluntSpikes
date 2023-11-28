@@ -14,7 +14,12 @@ def lane_emden_integrand(t, y, n):
     define y = [theta, z]
     """
 
-    return [y[1]/t**2, -t**2*y[0]**n]
+    #print(n, y[0], y[0]**n)
+    theta = y[0]
+    z     = y[1]
+    if (theta < 0): theta = 0
+    
+    return [z/t**2, -t**2*theta**n]
 
 class PolytropicSolver:
 

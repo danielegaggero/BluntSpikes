@@ -1,4 +1,3 @@
-#%%
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,16 +5,28 @@ import warnings
 
 from copy import copy
 
-from scipy.integrate import quad, cumulative_trapezoid
+from scipy.integrate import quad
 from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.optimize import root_scalar
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+try:
+    from scipy.integrate import cumulative_trapezoid
+except:
+    from scipy.integrate import cumtrapz as cumulative_trapezoid
+    
 #%%
 
 G_N = 4.302e-3 #Units of (pc/solar mass) (km/s)^2
 c_light = 2.9979e05 #km/s
+
+#-----------------------
+N_E_initial = 400
+N_L_initial = 401
+N_E_final   = 402
+#-----------------------
+
 
 def monotonic_Bspline(x_array, y_array, increasing = False):
 
@@ -42,7 +53,7 @@ def monotonic_Bspline(x_array, y_array, increasing = False):
         dw      = np.sum(ws != ws_new)
         ws      = ws_new
         if(dw == 0): break  
-        print(dw)
+        #print(dw)
 
     log_interp = interp1d(logx, mon_cof, kind = 'quadratic', fill_value = 0, bounds_error = 0)
     y_smooth_func = lambda x: np.heaviside(x_array[0] - x, 0)*10**mon_cof[0] + \
@@ -76,7 +87,7 @@ def smooth_Bspline(x_array, y_array, increasing = True):
         dw      = np.sum(ws != ws_new)
         ws      = ws_new
         if(dw == 0): break  
-        print(dw)
+        #print(dw)
 
     log_interp = interp1d(logx, mon_cof, kind = 'quadratic', fill_value = 0, bounds_error = 0)
     y_smooth_func = lambda x: np.heaviside(x_array[0] - x, 0)*10**mon_cof[0] + \
@@ -234,13 +245,13 @@ class Density:
 
         r_min = np.min(self._rho_properties_dict['r_array'])
 
-        r_grid = np.logspace(np.log10(r_min), np.log10(r), num = 1000)
+        r_grid = np.geomspace(r_min, r, num = 1000)
 
         # Integration doesn't work properly for point mass potentials,
         # so when the density reaches 0, stitch in point mass potential
         if sum(self._rho_func(r_grid) == 0) > 1:
             if not self._truncated:
-                print("Density is truncated")
+                #print("> Density is truncated")
                 self._truncated = True
                 self._r_break = r_grid[self._rho_func(r_grid) == 0][0]
                 self._phi_break = self.phi_of_r(self._r_break)
@@ -270,7 +281,7 @@ class Density:
     def M_enclosed(self, r):
         r_min = np.min(self._rho_properties_dict['r_array'])
 
-        r_grid = np.logspace(np.log10(r_min), np.log10(r), num = 1000)
+        r_grid = np.geomspace(r_min, r, num = 1000)
         try: 
             self._rho_func(0)
             r_grid = np.insert(r_grid, 0, 0)
@@ -279,7 +290,9 @@ class Density:
 
         integrand = lambda x: x*x*self._rho_func(x)
 
-        result = quad(integrand, 0, r)[0]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = quad(integrand, 0, r, limit=200)[0]
 
         if np.isnan(result) or (result == 0 and r > r_min):
             result = np.trapz(integrand(r_grid), r_grid)
@@ -297,7 +310,7 @@ class Density:
         eddington_funcs = []
 
         for i in range(len(mode)):
-            print('mode: ', mode[i])
+            #print('mode: ', mode[i])
             try:
                 self.calculate_f_eddington(mode = mode[i], smoothen = smoothen)
                 eddington_funcs.append(self._Eddington_func)
@@ -319,10 +332,10 @@ class Density:
 
         quality = np.abs(1 - averages) + stds
         best = np.argmin(quality)
-        print(averages)
-        print(stds)
-        print(best)
-        print(self._Eddington_func == eddington_funcs[best])
+        #print(averages)
+        #print(stds)
+        #print(best)
+        #print(self._Eddington_func == eddington_funcs[best])
 
         self._Eddington_func = eddington_funcs[best]
 
@@ -333,7 +346,9 @@ class Density:
         psi_array = self._psi_properties_dict['psi_array']
         reversed_psi = psi_array[::-1]
 
-        integrand_grid = eddington_func(reversed_psi)*np.sqrt(2*(E_max - reversed_psi))
+        delta = np.clip(E_max - reversed_psi, 0, 1e30)
+        #delta = E_max - reversed_psi
+        integrand_grid = eddington_func(reversed_psi)*np.sqrt(2*delta)
 
         mask_isnan = np.isnan(integrand_grid)
         mask_isinf = np.isinf(integrand_grid)
@@ -375,13 +390,16 @@ class Density:
         phase_space = np.array([self.f_Eddington_psi(E, d2rho_dpsi2, logged = logged) for E in energy_array])
         if np.any(phase_space < 0): raise ValueError("De Eddington function is fucking negatief")
 
-        f_eddington_interp = interp1d(energy_array, phase_space, fill_value = 0, bounds_error = False)
+        #BJK: Do the Eddington Trick
 
-        plt.figure()
-        plt.loglog(energy_array, phase_space, 'k.')
-        plt.show()
+        
+        f_eddington_interp = interp1d(np.log10(energy_array), np.log10(np.clip(phase_space, 1e-30, 1e30)), fill_value = -30, bounds_error = False)
 
-        self._Eddington_func = f_eddington_interp
+        #plt.figure()
+        #plt.loglog(energy_array, phase_space, 'k.')
+        #plt.show()
+
+        self._Eddington_func = lambda x: 10**f_eddington_interp(np.log10(x))
     
 
     def calculate_f_Eddington_function_phi(self, smoothen = False):
@@ -404,13 +422,13 @@ class Density:
         phase_space = np.array([self.f_Eddington_phi(E, d2rho_dphi2) for E in energy_array])
         if np.any(phase_space < 0): raise ValueError("De Eddington function is fucking negatief")
 
-        f_eddington_interp = interp1d(energy_array, phase_space, fill_value = 0, bounds_error = False)
+        f_eddington_interp = interp1d(np.log10(energy_array), np.log10(np.clip(phase_space, 1e-30, 1e30)), fill_value = -30, bounds_error = False)
 
-        plt.figure()
-        plt.loglog(energy_array, phase_space, 'k.')
-        plt.show()
+        #plt.figure()
+        #plt.loglog(energy_array, phase_space, 'k.')
+        #plt.show()
 
-        self._Eddington_func = f_eddington_interp
+        self._Eddington_func = lambda x: 10**f_eddington_interp(np.log10(x))
 
 
     def f_Eddington_psi(self, E: float, d2rho_dpsi2: callable, logged: bool = False) -> float:
@@ -422,9 +440,9 @@ class Density:
         # psi_array = self._psi_properties_dict['psi_array']
 
         if logged:
-            integrand = lambda psi: d2rho_dpsi2(np.log10(psi))/np.sqrt(E - psi)
+            integrand = lambda psi: d2rho_dpsi2(np.log10(psi))#/np.sqrt(E - psi)
         else:
-            integrand = lambda psi: d2rho_dpsi2(psi)/np.sqrt(E - psi)
+            integrand = lambda psi: d2rho_dpsi2(psi)#/np.sqrt(E - psi)
 
         # psi_grid = np.logspace(np.log10(psi_min), np.log10(E), num = 2000)
         # psi_grid = np.append(psi_grid, E - np.logspace(np.log10(dpsi_min), min(np.log10(psi_max)//1 - 2, 0.99*np.log10(E - 0.99*psi_min)), num = 4000))
@@ -435,14 +453,15 @@ class Density:
 
         u_max = self._u_sample_func(E)
         psi_grid = self._E_sample_func(np.linspace(0, u_max, num = 10000))
+        Q_grid = np.sqrt(E - psi_grid)
 
         integrand_grid = integrand(psi_grid)
         # integrand_grid[integrand_grid < 0] = 0
         integrand_grid[np.isnan(integrand_grid)] = 0
         integrand_grid[np.isinf(integrand_grid)] = 0
-        result = np.trapz(integrand_grid[integrand_grid > 0], psi_grid[integrand_grid > 0])
+        result = -np.trapz(integrand_grid[integrand_grid > 0], Q_grid[integrand_grid > 0])
 
-        f = (result)/(np.pi**2*8**0.5)
+        f = (result)/(np.pi**2*2**0.5)
 
         return f
 
@@ -456,7 +475,7 @@ class Density:
         shift = self._phi_properties_dict['shift']
         # psi_array = self._psi_properties_dict['psi_array']
 
-        integrand = lambda psi: d2rho_dphi2(shift - psi)/np.sqrt(E - psi)
+        integrand = lambda psi: d2rho_dphi2(shift - psi)#/np.sqrt(E - psi)
 
         # psi_grid = np.logspace(np.log10(psi_min), np.log10(E), num = 2000)
         # psi_grid = np.append(psi_grid, E - np.logspace(np.log10(dpsi_min), min(np.log10(psi_max)//1 - 2, 0.99*np.log10(E - 0.99*psi_min)), num = 4000))
@@ -467,13 +486,14 @@ class Density:
 
         u_max = self._u_sample_func(E)
         psi_grid = self._E_sample_func(np.linspace(0, u_max, num = 10000))
+        Q_grid = np.sqrt(E - psi_grid)
 
         integrand_grid = integrand(psi_grid)
         integrand_grid[np.isnan(integrand_grid)] = 0
         integrand_grid[np.isinf(integrand_grid)] = 0
-        result = np.trapz(integrand_grid[integrand_grid > 0], psi_grid[integrand_grid > 0])
+        result = -np.trapz(integrand_grid[integrand_grid > 0], Q_grid[integrand_grid > 0])
 
-        f = (result)/(np.pi**2*8**0.5)
+        f = (result)/(np.pi**2*2**0.5)
 
         return f
     
@@ -524,14 +544,14 @@ class Density:
             mask = reversed_rho > 0
             smooth_rho_psi = smooth_Bspline(reversed_psi[mask], reversed_rho[mask], increasing = True)
             smooth_rho_array = smooth_rho_psi(reversed_psi)
-            drho_dpsi_interp = interp1d(reversed_psi, np.diff(smooth_rho_array, prepend = reversed_rho[0])/np.diff(reversed_psi, prepend = reversed_psi[0]), 
+            drho_dpsi_interp = interp1d(reversed_psi, np.diff(smooth_rho_array, prepend = reversed_rho[0])/np.diff(reversed_psi, prepend = 0.99*reversed_psi[0]), 
                                 kind = 'linear', fill_value = 'extrapolate')
         else:
-            drho_dpsi_interp = interp1d(reversed_psi, np.diff(reversed_rho, prepend = reversed_rho[0])/np.diff(reversed_psi, prepend = reversed_psi[0]), 
+            drho_dpsi_interp = interp1d(reversed_psi, np.diff(reversed_rho, prepend = reversed_rho[0])/np.diff(reversed_psi, prepend = 0.99*reversed_psi[0]), 
                                 kind = 'linear', fill_value = 'extrapolate')
             
         drho_dpsi_array = drho_dpsi_interp(reversed_psi)
-        d2rho_dpsi2_interp = interp1d(reversed_psi, np.diff(drho_dpsi_array, prepend = drho_dpsi_array[0])/np.diff(reversed_psi, prepend = reversed_psi[0]), 
+        d2rho_dpsi2_interp = interp1d(reversed_psi, np.diff(drho_dpsi_array, prepend = drho_dpsi_array[0])/np.diff(reversed_psi, prepend = 0.99*reversed_psi[0]), 
                                 kind = 'linear', fill_value = 'extrapolate')
 
         return d2rho_dpsi2_interp
@@ -1084,30 +1104,53 @@ class Density:
     #     result = np.trapz(integrand_grid, r_range)
     #     return 2*result
 
-    def radial_action(self, E, L, psi_func):
+    #MARK2
+    def radial_action(self, E, L, psi_func, ax=None):
 
-        r_array = self._rho_properties_dict['r_array']
+        r_array0 = self._rho_properties_dict['r_array']
+        #psi_array = psi_func(r_array)
+
+        r_array = np.geomspace(np.min(r_array0), np.max(r_array0), 1000)
+
+        #r_max = np.min(r_array(E > psi_array))
         
         v_r_squared = lambda r: 2*psi_func(r) - 2*E - L**2/r**2
         v_r_squared_array = v_r_squared(r_array)
 
         r_real = r_array[v_r_squared_array >= 0]
 
+        if (ax is None):
+            pass
+        else:
+            ax.loglog(r_real, np.sqrt(v_r_squared(r_real)), label=str(np.log10(E)))
+            #plt.legend()
+
+        #print(np.log10(E), len(r_real))
+        #if (len(r_real) < 5):
+        #    return 1e-30
         if len(r_real) == 0: # No roots within r_array
             return 1E-30
-        elif len(r_real) == 1:
-            r_refined = np.linspace(r_real[0]*0.9, r_real[0]*1.1, num = 100)
+        elif len(r_real) <= 100:
+            r_refined = np.geomspace(r_real[0]*0.75, r_real[-1]*1.25, num = 300)
             v_r_squared_refined = v_r_squared(r_refined)
 
             r_real_refined = r_refined[v_r_squared_refined >= 0]
+            #print(len(r_real_refined))
+            #plt.figure()
+            #plt.loglog(r_real_refined,np.sqrt(v_r_squared(r_real_refined)))
+            #plt.show()
+            
             if len(r_real_refined) < 2: return 1E-30
             I_r = np.trapz(np.sqrt(v_r_squared(r_real_refined)), r_real_refined)
+            #print(I_r)
             return I_r
 
         # elif r_real[0] == r_array[0]:  # Only one root at large r (small r root cannot be resolved)
         #     return 1E-30
         # elif r_real[-1] == r_array[-1]: # Only one root at small r (large r root outside of r_array)
         #     return 1E-30
+
+
 
         I_r = np.trapz(np.sqrt(v_r_squared(r_real)), r_real)
 
@@ -1118,8 +1161,17 @@ class Density:
 
         E_max = psi_func(r)
 
-        integrand_grid = phase_space_mesh * L_mesh/(2*E_max - 2*E_mesh - (L_mesh/r)**2)**0.5
+        v_r_sq = 2*E_max - 2*E_mesh - (L_mesh/r)**2
 
+        inds = v_r_sq > 0
+        integrand_grid = 0.0*phase_space_mesh
+        
+        
+        integrand_grid[inds] = phase_space_mesh[inds] * L_mesh[inds]/(v_r_sq[inds])**0.5
+
+        #print(phase_space_mesh)
+
+        
         mask_BH_E = E_mesh > psi_func(r)*(1 - 4*r_S/r)
 
         mask_isnan = np.isnan(integrand_grid)
@@ -1131,19 +1183,20 @@ class Density:
         inner_integral = np.trapz(integrand_grid, L_mesh, axis = 1)
 
         inner_integral[np.isnan(inner_integral)] = 0
+        
         outer_integral = np.trapz(inner_integral, E_mesh[:, 0])
-
+        
         return 4*np.pi*np.abs(outer_integral)/r**2
 
 
     def adiabatic_growth(self, delta_psi, r_S = 0, refinement = 5, inplace = False, figures = False, cmap = 'viridis'):
 
-        print("Welcome to the Adiabatic Growth routine")
+        #print("Welcome to the Adiabatic Growth routine")
 
         r_array = self._rho_properties_dict['r_array']
 
         if self._psi_func == None:
-            print("Calculating initial densities and potentials")
+            print("    > Calculating initial densities and potentials")
             self.setup_potentials()
 
         psi_array = self._psi_properties_dict['psi_array']
@@ -1161,16 +1214,16 @@ class Density:
             plt.show()
 
         if self._Eddington_func == None:
-            print("Calculating Eddington function")
+            print("    > Calculating Eddington function")
             self.setup_phase_space()
 
         psi_max = self._psi_properties_dict['psi_max']
         psi_min = self._psi_properties_dict['psi_min']
         dpsi_min = self._psi_properties_dict['dpsi_min']
 
-        E_initial = np.logspace(np.log10(psi_min), np.log10(psi_max), num = 1000)
-        E_initial = np.append(E_initial, psi_max - np.logspace(np.log10(dpsi_min), min(np.log10(psi_max)//1 - 2, np.log10(psi_max - psi_min)), num = 2000))
-        E_initial = np.append(E_initial, np.linspace(psi_min, psi_max, num = 1000))
+        E_initial = np.logspace(np.log10(psi_min), np.log10(psi_max), num = N_E_initial)
+        E_initial = np.append(E_initial, psi_max - np.logspace(np.log10(dpsi_min), min(np.log10(psi_max)//1 - 2, np.log10(psi_max - psi_min)), num = N_E_initial))
+        E_initial = np.append(E_initial, np.linspace(psi_min, psi_max, num = N_E_initial))
         E_initial = np.unique(E_initial)
 
         # E_initial = self._E_sample_func(np.linspace(0, 1, num = 10000))
@@ -1187,19 +1240,30 @@ class Density:
         psi_final_max = np.max(psi_final_array)
         psi_final = UnivariateSpline(r_array, psi_final_array, k = 3, s = 0)
 
+        
         L_max = np.max(r_array*np.sqrt(psi_final_array))
         L_min = 2*c_light*r_S
-        L_initial = np.logspace(np.log10(max(L_min, 1E-10)), np.log10(L_max), num = 500)
-        L_initial = np.append(L_initial, np.linspace(0, L_max, num = 500))
+        L_initial = np.logspace(np.log10(max(L_min, 1E-10)), np.log10(L_max), num = N_L_initial)
+        L_initial = np.append(L_initial, np.linspace(0, L_max, num = N_L_initial))
         L_initial = np.unique(L_initial)
         Ev_initial, Lv_initial = np.meshgrid(E_initial, L_initial, indexing = 'ij')
 
-        print("Calculating initial radial action")
+        print("    > Calculating initial radial action")
+        #Ir_initial = 0.0*Ev_initial
+        #print(Ir_initial.shape)
+        #for i, e in enumerate(E_initial):
+        #    Ir_initial[i,:] = np.array([self.radial_action(e, l, self._psi_func) for l in L_initial])
         Ir_initial = np.array([[self.radial_action(e, l, self._psi_func) for l in L_initial] for e in E_initial])
+
+        #plt.figure()
+        #for k in range(N_L_initial):
+        #    plt.plot(E_initial, Ir_initial[:,k])
+        #plt.show()
 
         mask = Ir_initial[1:] > 1E-30
         Ir_initial_diff = np.log10(Ir_initial[:-1][mask]/Ir_initial[1:][mask])
 
+        #Threshold is log10 of the dynamic range of Ir_initial (divided by 'refinement')
         threshold = np.log10(np.max(Ir_initial)/np.min(Ir_initial[Ir_initial > 1E-30]))/refinement
 
         if figures:
@@ -1283,16 +1347,44 @@ class Density:
 
         switch_index = np.argmin(np.abs(psi_final_array - 2*psi_array))
 
-        E_final = np.logspace(np.log10(psi_final_min), np.log10(psi_final_max), num = 200)
-        E_final = np.append(E_final, psi_final_max - np.logspace(np.log10(dpsi_min), min(np.log10(psi_max)//1 - 2, np.log10(psi_max - psi_min)), num = 200))
-        E_final = np.append(E_final, np.logspace(np.log10(psi_final_array[switch_index]) - 1, np.log10(psi_final_array[switch_index]), num = 200))
-        E_final = np.append(E_final, np.linspace(psi_final_min, psi_final_max, num = 200))
-        E_final = np.unique(E_final)
+        
 
+        E_final = np.logspace(np.log10(psi_final_min), np.log10(psi_final_max), num = N_E_final)
+        E_final = np.append(E_final, psi_final_max - np.logspace(np.log10(dpsi_min), min(np.log10(psi_max)//1 - 2, np.log10(psi_max - psi_min)), num = N_E_final))
+        E_final = np.append(E_final, np.logspace(np.log10(psi_final_array[switch_index]) - 1, np.log10(psi_final_array[switch_index]), num = N_E_final))
+        E_final = np.append(E_final, np.linspace(psi_final_min, psi_final_max, num = N_E_final))
+        E_final = np.unique(E_final)
+        
         Ev_final, Lv_final = np.meshgrid(E_final, L_initial, indexing = 'ij')
 
-        print("Calculating final radial action")
+        #print("Calculating final radial action")
+        
+        #MARK1
+        #plt.figure()
+        #ax = plt.gca()
+        #for ii in range(10):
+            #print(ii)
+            #print(np.log10(E_final[-ii-1]))
+            #self.radial_action(E_final[-ii-1], L_initial[1], psi_final, ax)
+        #print(L_initial[1])
+        #self.radial_action(4.29e12, L_initial[1], psi_final, ax)
+        #self.radial_action(1e12, L_initial[1], psi_final, ax)
+        #ax.legend()
+        #plt.show()
+        
+        print("    > Calculating final radial action")
+        #Ir_final = 0.0*Ev_final
+        #for i, e in enumerate(E_initial):
+        #    Ir_final[i, :] = np.array([self.radial_action(e, l, psi_final) for l in L_initial])
         Ir_final = np.array([[self.radial_action(e, l, psi_final) for l in L_initial] for e in E_final])
+
+        #print(E_final.shape, L_initial.shape, Ir_final.shape)
+        #plt.figure()
+        #for k in range(N_L_initial):
+        #    plt.loglog(E_final, Ir_final[:,k], label=str(np.log10(L_initial[k])))
+        #plt.legend()
+        #plt.show()
+        
 
         mask = Ir_final[1:] > 1E-30
         Ir_final_diff = np.log10(Ir_final[:-1][mask]/Ir_final[1:][mask])
@@ -1332,6 +1424,8 @@ class Density:
 
             E_final_new = np.copy(E_final_old)
 
+            #print(E_final_undersampled)
+            #print(index_undersampled)
             for i in range(len(index_undersampled)):
                 ind = index_undersampled[i]
 
@@ -1394,7 +1488,7 @@ class Density:
             plt.show()
 
 
-        print("Calculating E_i(E_f, L_f)")
+        print("    > Calculating E_i(E_f, L_f)")
         initial_energies = np.zeros_like(Ev_final)
         for i in range(len(E_final_old)):
             for j in range(len(L_initial)):
@@ -1427,7 +1521,7 @@ class Density:
 
         phase_space = self._Eddington_func(initial_energies)
 
-        print("Calculating final density")
+        print("    > Calculating final density")
         rho_final_array = np.array([self.reconstruct_density(r, Ev_final, Lv_final, phase_space, psi_final, r_S = r_S) for r in r_array])
         rho_final = UnivariateSpline(r_array, rho_final_array, k = 3, s = 0)
 
@@ -1458,7 +1552,7 @@ class Density:
             # Update the density instance with either new values if available, and reset if not
             self._rho_func = rho_final
             self._rho_properties_dict['rho_array'] = rho_final_array
-            
+        
             self._psi_func = None
             self._psi_properties_dict = None
 
@@ -1472,4 +1566,3 @@ class Density:
 
         else:
             return Density(self._name+'adiabatic', rho_final, r_array, self._N)
-
