@@ -36,27 +36,74 @@ plt.rcParams.update({
     "text.usetex": True
 })
 
-
 #%%
 
 G_N = 4.302e-3 #Units of (pc/solar mass) (km/s)^2
 c_light = 2.9979e05 #km/s
 
-#r_array = np.logspace(-10, 3, num = 1301)
-r_array = np.geomspace(1e-10, 1e3, num = 600)
+G_N_Mpc = 1e-6*4.302e-3 #(Mpc/solar mass) (km/s)^2
 
-M_halo = 2E8
-z = 20
-R_vir = 1E3 #0.784*(Planck18.Om0/Planck18.Om(15))**(-1/3) * (M_halo*1E-8*Planck18.h)**(1/3) * (10/(z + 1)) / Planck18.h *1E3
-c = 15
+h = 0.678
+Omega_DM = 0.1186/(h**2)
+H0 = 100.0*h #(km/s) Mpc^-1
+H0_peryr = 67.8*(3.24e-20)*(60*60*24*365)
+ageUniverse = 13.799e9 #y
+Omega_L = 0.692
+Omega_m = 0.308
+Omega_r = 9.3e-5
+
+z_eq = 3375.0
+rho_eq = 1512.0 #Solar masses per pc^3
+sigma_eq = 0.005 #Variance of DM density perturbations at equality
+lambda_max = 3.0 #Maximum value of lambda = 3.0*z_dec/z_eq (i.e. binaries decouple all the way up to z_dec = z_eq)
+
+def Hubble(z):
+    return H0_peryr*np.sqrt(Omega_L + Omega_m*(1+z)**3 + Omega_r*(1+z)**4)
+
+def Hubble2(z):
+    return H0*np.sqrt(Omega_L + Omega_m*(1+z)**3 + Omega_r*(1+z)**4)
+
+rho_critical_today_Mpc = 3.0*H0**2/(8.0*np.pi*G_N_Mpc) #Solar masses per Mpc^3
+rho_critical_today = rho_critical_today_Mpc / 1.e18
+
+def rho_critical_Mpc(z):
+    return 3.0*Hubble2(z)**2/(8*np.pi*G_N_Mpc) #Solar masses per pc^3
+
+def rho_critical(z):
+    return 3.0*Hubble2(z)**2/(8*np.pi*G_N_Mpc*1.e18) #Solar masses per pc^3
+
+print("Critical density today [MSun/pc**3] ", rho_critical(0))
+
+r_array = np.logspace(-10, 3, num = 1301)
+
+M_halo = 1.E8
+z = 15
+## Concentration
+c = 3. #https://arxiv.org/pdf/1502.00391.pdf Fig. 7
+
+#R_vir = 1E3 #0.784*(Planck18.Om0/Planck18.Om(15))**(-1/3) * (M_halo*1E-8*Planck18.h)**(1/3) * (10/(z + 1)) / Planck18.h *1E3
+## Virial radius in pc
+R_vir = (3.*M_halo/(4.*np.pi*200.*rho_critical(z)))**(1./3)  #pc
+
+print("Critical density at z = 15", rho_critical(z), " [Msun/pc**3]")
+print("Virial radius at z = 15", R_vir, " [pc]")
+
+"""
+R_s = R_vir/c
+a_NFW = np.log(1 + c) - c/(1 + c)
+rho_s = M_halo/(4. * np.pi * R_s**3. * a_NFW)
+def rho_NFW(r):
+    return rho_s * (R_s/r) / (1 + r/R_s)**2 * np.exp(-r/R_vir)
+"""
+
+R_s = R_vir/c
 a_NFW = np.log(1 + c) - c/(1 + c)
 rho_halo = M_halo/(4/3 * np.pi * R_vir**3)
-
 rho_0_prime = rho_halo*c**3/(3*a_NFW)
-R_s = R_vir/c
-
 def rho_NFW(r):
     return rho_0_prime * (R_s/r) / (1 + r/R_s)**2 * np.exp(-r/R_vir)
+
+#input("Press Enter to continue...")
 
 rho_0_gas_i = 1E-23 * (3.0857E18)**3 / (1.9885E33) # M_sun/pc^3
 r_c_i = 1E1
@@ -109,8 +156,8 @@ r_reconstructed = np.array(r_reconstructed)
 
 rho_SMS_bloated_interp = interp1d(np.array(r_reconstructed), rho_M_interp(x_test), fill_value = (rho_M_interp(x_test[0]), 0), bounds_error = False)
 
-m_proto = 1E3
-n = 3/2
+m_proto = 1.E5
+n = 3
 rho_c = 0.1 * (3.0857E18)**3 / (1.9885E33) # M_sun/pc^3
 poly_solver = PolytropicSolver(n)
 r_array_poly, rho_array_poly = poly_solver(rho_c, m_proto)
@@ -120,13 +167,12 @@ r_core = 5E-7
 
 #%%
 
-
-
 plt.figure()
 plt.loglog(r_array, rho_NFW(r_array), c = rgb_palette_dict['dark sienna'], label = 'initial NFW')
-plt.loglog(r_array, rho_gas_initial(r_array), c = rgb_palette_dict['pine green'], label = 'initial gas cloud')
-plt.loglog(r_array, rho_gas_final(r_array), c = rgb_palette_dict['turquiose'], label = 'collapsed gas cloud')
-plt.loglog(r_array, rho_SMS_bloated_interp(r_array), c = rgb_palette_dict['flickr pink'], label = r'$10^5 M_\odot$ SMS')
+#plt.loglog(r_array, rho_gas_initial(r_array), c = rgb_palette_dict['pine green'], label = 'initial gas cloud')
+#plt.loglog(r_array, rho_gas_final(r_array), c = rgb_palette_dict['turquiose'], label = 'collapsed gas cloud')
+plt.loglog(r_array, rho_SMS_bloated_interp(r_array), c = rgb_palette_dict['flickr pink'], ls="--", label = r'$10^5 M_\odot$ SMS, Hosokawa solution')
+plt.loglog(r_array_poly, rho_proto_poly_interp(r_array_poly), c = rgb_palette_dict['pine green'], label = r'$10^5 M_\odot$ SMS, Lane-Emden solution')
 # plt.loglog(r_array, rho_proto_poly_interp(r_array), c = rgb_palette_dict['flickr pink'])
 plt.xlim(1E-9, 1E3)
 plt.ylim(bottom = 1E-4)
@@ -134,8 +180,7 @@ plt.xlabel(r'$r$ (pc)')
 plt.ylabel(r'$\rho$ ($M_\odot$ pc$^{-3}$)')
 plt.legend()
 plt.savefig('./figures/density_NFW_gas_star_densities.pdf')
-#plt.show()
-
+plt.show()
 #%%
 
 print("> Creating Density objects...")
