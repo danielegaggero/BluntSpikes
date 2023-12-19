@@ -16,15 +16,18 @@ try:
 except:
     from scipy.integrate import cumtrapz as cumulative_trapezoid
     
+
+    
 #%%
 
 G_N = 4.302e-3 #Units of (pc/solar mass) (km/s)^2
 c_light = 2.9979e05 #km/s
 
+#BJK: Use N = 500 for each
 #-----------------------
-N_E_initial = 400
-N_L_initial = 401
-N_E_final   = 402
+N_E_initial = 500
+N_L_initial = 500
+N_E_final   = 500
 #-----------------------
 
 
@@ -1189,7 +1192,7 @@ class Density:
         return 4*np.pi*np.abs(outer_integral)/r**2
 
 
-    def adiabatic_growth(self, delta_psi, r_S = 0, refinement = 5, inplace = False, figures = False, cmap = 'viridis'):
+    def adiabatic_growth(self, delta_psi, r_S = 0, refinement = 5, inplace = False, figures = False, cmap = 'viridis', return_DF=False):
 
         #print("Welcome to the Adiabatic Growth routine")
 
@@ -1564,5 +1567,7 @@ class Density:
             self.output_rseries_dataframe.where(self.output_rseries_dataframe == 0, 0, inplace = True)
             self.output_variables_dataframe.where(self.output_variables_dataframe == 0, 0, inplace = True)
 
+        elif return_DF:
+            return Density(self._name+'adiabatic', rho_final, r_array, self._N), Ev_final, Lv_final, phase_space
         else:
             return Density(self._name+'adiabatic', rho_final, r_array, self._N)
