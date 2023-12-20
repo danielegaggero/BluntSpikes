@@ -104,12 +104,12 @@ def rho_NFW(r):
 
 #Number of particles in the sample
 #---------------------------------
-N_particles = int(1e5)
+N_particles = int(1e4)
 
 
 #Calculate adiabatic phase-space from scratch
 #---------------------------------
-FROM_SCRATCH = True
+FROM_SCRATCH = False
 
 
 R_s = R_vir/c
@@ -298,7 +298,7 @@ print("> Supermassive star formation...")
 if ((FROM_SCRATCH) or (not os.path.isfile("f_grid.npy"))):
     print("> Calling Adiabatic Growth...")
     #BJK: Use refinement=15
-    density_after_SMS, E_grid, L_grid, f_grid = density_NFW.adiabatic_growth(psi_SMS_bloated, refinement = 15, figures = False, return_DF=True)
+    density_after_SMS, E_grid, L_grid, f_grid = density_NFW.adiabatic_growth(psi_proto_poly, refinement = 15, figures = False, return_DF=True)
     #######################################################################################################################
     #######################################################################################################################
     #######################################################################################################################
@@ -311,7 +311,7 @@ if ((FROM_SCRATCH) or (not os.path.isfile("f_grid.npy"))):
     np.save("L_grid.npy", L_grid)
     np.save("f_grid.npy", f_grid)
     
-    _psi = psi_NFW(r_array) + psi_SMS_bloated(r_array)
+    _psi = psi_NFW(r_array) + psi_proto_poly(r_array)
     
     T_orb_grid = 0.0*f_grid
     for i, E in enumerate(tqdm(E_grid[:,0])):
@@ -321,7 +321,7 @@ if ((FROM_SCRATCH) or (not os.path.isfile("f_grid.npy"))):
             
             if ((np.sum(inds) > 0) and (np.sum(inds) < 100)):
                 _r = np.geomspace(np.min(r_array[inds]), np.max(r_array[inds]), 250)
-                _psi_new = psi_NFW(_r) + psi_SMS_bloated(_r)
+                _psi_new = psi_NFW(_r) + psi_proto_poly(_r)
                 vr_sq_grid = 2*_psi_new - 2*E - L**2/_r**2
                 inds = vr_sq_grid > 0
             
@@ -371,14 +371,21 @@ deltaL = np.max(L_grid[0,:]) - Lmin
 deltalogE = np.log(np.max(E_grid[:,0])) - np.log(np.min(E_grid[:,0]))
 deltalogL = np.log(np.max(L_grid[0,:])) - np.log(Lmin)
 
-_psi = psi_NFW(r_array) + psi_SMS_bloated(r_array)
+_psi = psi_NFW(r_array) + psi_proto_poly(r_array)
 
+print("Shapes")
+print(E_grid.shape)
+print(L_grid.shape)
+print(T_orb_grid.shape)
+print(f_grid.shape)
 
 points = (E_grid[:,0], L_grid[0,:])
 new_points = (E_samps, L_samps)
 
-f_E_L = interpn(points, (4*np.pi)**2*(L_grid*T_orb_grid)*f_grid, new_points, bounds_error=False, fill_value=0.0)
+print("Running interpn")
 
+#f_E_L_prova = interpn(points,  (4*np.pi)**2*(L_grid*T_orb_grid)*f_grid , new_points, bounds_error=False, fill_value=0.0)
+f_E_L = interpn(points,  (4*np.pi)**2*(L_grid*T_orb_grid)*f_grid, new_points, bounds_error=False, fill_value=0.0)
 
 p_samps = 1/(E_samps*L_samps)
 #p_samps = 1.0
@@ -388,7 +395,7 @@ Vol = deltalogE*deltalogL
 
 print("Total:", Vol*np.sum(weights)/N_particles/M_halo)
 
-_psi = psi_NFW(r_array) + psi_SMS_bloated(r_array)
+_psi = psi_NFW(r_array) + psi_proto_poly(r_array)
 
 # Reconstructing Density Profile
 #-------------------------------
@@ -406,7 +413,7 @@ for i in tqdm(range(N_particles),desc="Calculating density profile"):
         
         if ((np.sum(inds) > 0) and (np.sum(inds) < 100)):
             _r = np.geomspace(np.min(r_array[inds]), np.max(r_array[inds]), 250)
-            _psi_new = psi_NFW(_r) + psi_SMS_bloated(_r)
+            _psi_new = psi_NFW(_r) + psi_psi_proto_poly(_r)
             vr_sq_grid = 2*_psi_new - 2*E - L**2/_r**2
             inds = vr_sq_grid > 0
         
@@ -435,7 +442,7 @@ rho_r_A = P_r_A/(4*np.pi*r_array**2)
 
 r_samps = 0.0*E_samps
 
-psi_fun = lambda x: psi_NFW(x) + psi_SMS_bloated(x)
+psi_fun = lambda x: psi_NFW(x) + psi_proto_poly(x)
 for i in tqdm(range(N_particles)):
     found = False
     if (weights[i] < 1e-20):
@@ -474,7 +481,7 @@ for i in tqdm(range(N_particles)):
 #Instantaneous BH formation
 #--------------------------
 
-E_f_samps = E_samps - psi_SMS_bloated(r_samps) + psi_BH(r_samps)
+E_f_samps = E_samps - psi_proto_poly(r_samps) + psi_BH(r_samps)
 
 _psi = psi_NFW(r_array) + psi_BH(r_array)
 
