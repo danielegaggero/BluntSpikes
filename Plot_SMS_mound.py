@@ -79,8 +79,6 @@ def rho_critical(z):
 
 print("Critical density today [MSun/pc**3] ", rho_critical(0))
 
-r_array = np.logspace(-10, 3, num = 1301)
-
 M_halo = 1.E8
 z = 15
 ## Concentration
@@ -104,8 +102,7 @@ def rho_NFW(r):
 
 #Number of particles in the sample
 #---------------------------------
-N_particles = int(1e6)
-
+N_particles = int(1e5)
 
 #Calculate adiabatic phase-space from scratch
 #---------------------------------
@@ -198,7 +195,7 @@ plt.xlabel(r'$r$ (pc)')
 plt.ylabel(r'$\rho$ ($M_\odot$ pc$^{-3}$)')
 plt.legend()
 plt.savefig('./figures/density_NFW_gas_star_densities.pdf')
-plt.show()
+
 #%%
 
 print("> Creating Density objects...")
@@ -331,6 +328,8 @@ else:
     
     T_orb_grid    = np.load("T_orb_grid.npy")
 
+print(f_grid.flags)
+
 f_grid[np.isnan(f_grid)] = 0.0
 
 def lin_sampler(x_min, x_max, N):
@@ -361,7 +360,8 @@ _psi = psi_NFW(r_array) + psi_SMS_bloated(r_array)
 
 
 points = (E_grid[:,0], L_grid[0,:])
-new_points = (E_samps, L_samps)
+new_points = np.array((E_samps, L_samps)).T
+
 
 f_E_L = interpn(points, (4*np.pi)**2*(L_grid*T_orb_grid)*f_grid, new_points, bounds_error=False, fill_value=0.0)
 
