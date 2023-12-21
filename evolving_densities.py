@@ -25,9 +25,9 @@ c_light = 2.9979e05 #km/s
 
 #BJK: Use N = 500 for each
 #-----------------------
-N_E_initial = 100
-N_L_initial = 100
-N_E_final   = 100
+N_E_initial = 500
+N_L_initial = 1000
+N_E_final   = 500
 #-----------------------
 
 

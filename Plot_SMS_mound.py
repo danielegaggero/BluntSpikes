@@ -102,12 +102,12 @@ def rho_NFW(r):
 
 #Number of particles in the sample
 #---------------------------------
-N_particles = int(1e5)
+N_particles = int(1e6)
+
 
 #Calculate adiabatic phase-space from scratch
 #---------------------------------
 FROM_SCRATCH = False
-
 
 
 R_s = R_vir/c
@@ -171,12 +171,15 @@ r_reconstructed = np.array(r_reconstructed)
 
 rho_SMS_bloated_interp = interp1d(np.array(r_reconstructed), rho_M_interp(x_test), fill_value = (rho_M_interp(x_test[0]), 0), bounds_error = False)
 
-m_proto = 1.E5
+m_proto = M_tot
 n = 3
-rho_c = 0.1 * (3.0857E18)**3 / (1.9885E33) # M_sun/pc^3
+rho_c = 1. * (3.0857E18)**3 / (1.9885E33) # M_sun/pc^3
 poly_solver = PolytropicSolver(n)
 r_array_poly, rho_array_poly = poly_solver(rho_c, m_proto)
 rho_proto_poly_interp = interp1d(r_array_poly, rho_array_poly, fill_value = (rho_array_poly[0], 0), bounds_error = False)
+
+r_poly = np.min(r_array_poly[rho_array_poly <= 0])
+print("r_poly:", r_poly)
 
 r_core = 5E-7
 
@@ -186,7 +189,7 @@ plt.figure()
 plt.loglog(r_array, rho_NFW(r_array), c = rgb_palette_dict['dark sienna'], label = 'initial NFW')
 #plt.loglog(r_array, rho_gas_initial(r_array), c = rgb_palette_dict['pine green'], label = 'initial gas cloud')
 #plt.loglog(r_array, rho_gas_final(r_array), c = rgb_palette_dict['turquiose'], label = 'collapsed gas cloud')
-plt.loglog(r_array, rho_SMS_bloated_interp(r_array), c = rgb_palette_dict['flickr pink'], ls="--", label = r'$10^5 M_\odot$ SMS, Hosokawa solution')
+#plt.loglog(r_array, rho_SMS_bloated_interp(r_array), c = rgb_palette_dict['flickr pink'], ls="--", label = r'$10^5 M_\odot$ SMS, Hosokawa solution')
 plt.loglog(r_array_poly, rho_proto_poly_interp(r_array_poly), c = rgb_palette_dict['pine green'], label = r'$10^5 M_\odot$ SMS, Lane-Emden solution')
 # plt.loglog(r_array, rho_proto_poly_interp(r_array), c = rgb_palette_dict['flickr pink'])
 plt.xlim(1E-9, 1E3)
@@ -248,6 +251,7 @@ plt.loglog(r_array, psi_NFW(r_array), c = rgb_palette_dict['dark sienna'], label
 plt.loglog(r_array, psi_gas_i(r_array), c = rgb_palette_dict['pine green'], label = 'initial gas cloud')
 plt.loglog(r_array, psi_gas_f(r_array), c = rgb_palette_dict['turquiose'], label = 'collapsed gas cloud')
 plt.loglog(r_array, psi_SMS_bloated(r_array), c = rgb_palette_dict['flickr pink'], label = r'$10^5 M_\odot$ SMS')
+plt.loglog(r_array, psi_proto_poly(r_array), c = 'C0', label = r'$10^5 M_\odot$ Polytrope')
 plt.xlim(1E-9, 1E3)
 plt.legend()
 plt.xlabel('$r$ (pc)')
@@ -257,12 +261,33 @@ plt.savefig('./figures/density_NFW_gas_star_potentials.pdf')
 
 #%%
 
-m_BH = M_tot_SMS_bloated*1.
+m_BH = M_tot
 r_S = 2*G_N*m_BH/c_light**2
 def psi_BH(r):
     return G_N*m_BH/r
 
-r_sp = 0.122 * R_s * ( m_BH / ( rho_0_prime * R_s**3 ) )**(1./(3.-1))
+#r_sp = 0.122 * R_s * ( m_BH / ( rho_0_prime * R_s**3 ) )**(1./(3.-1))
+
+gamma_PL = 1.
+r_0   = R_s
+rho_0 = rho_0_prime/4.
+gamma_sp_GS = (9. - 2.*gamma_PL)/(4. - gamma_PL)
+
+
+alpha_gamma = 0.293 * (gamma_PL)**(4./9.)
+
+def g_GS(r):
+    return (1. - 2.*r_S/r)**3.
+
+r_sp_GS = alpha_gamma * r_0 * (m_BH / (rho_0 * r_0**3.))**(1./(3. - gamma_PL))
+
+print(">------- NOTE THAT WE'RE USING A FACTOR OF 2 TO FUDGE THE RESULTS: CHECK WHERE IT COMES FROM!")
+rho_R = 0.5*rho_0*(r_sp_GS/r_0)**(-gamma_PL)
+
+def rho_GS(r):
+    return rho_0_prime * (R_s/r) / (1 + r/R_s)**2 * np.exp(-r/R_vir) + g_GS(r) * rho_R*(r_sp_GS/r)**(gamma_sp_GS)
+
+rho_GS_array = rho_GS(r_array)
 
 
 #plt.figure()
@@ -274,14 +299,13 @@ r_sp = 0.122 * R_s * ( m_BH / ( rho_0_prime * R_s**3 ) )**(1./(3.-1))
 #plt.loglog(r_array, +psi_SMS_bloated(r_array) - psi_BH(r_array))
 #plt.show()
 
-
 # delta_psi = lambda r: psi_SMS_bloated(r) - psi_proto_poly(r)
 print("> Supermassive star formation...")
 
 if ((FROM_SCRATCH) or (not os.path.isfile("f_grid.npy"))):
     print("> Calling Adiabatic Growth...")
     #BJK: Use refinement=15
-    density_after_SMS, E_grid, L_grid, f_grid = density_NFW.adiabatic_growth(psi_SMS_bloated, refinement = 15, figures = False, return_DF=True)
+    density_after_SMS, E_grid, L_grid, f_grid = density_NFW.adiabatic_growth(psi_proto_poly, refinement = 15, figures = False, return_DF=True)
     #######################################################################################################################
     #######################################################################################################################
     #######################################################################################################################
@@ -294,7 +318,7 @@ if ((FROM_SCRATCH) or (not os.path.isfile("f_grid.npy"))):
     np.save("L_grid.npy", L_grid)
     np.save("f_grid.npy", f_grid)
     
-    _psi = psi_NFW(r_array) + psi_SMS_bloated(r_array)
+    _psi = psi_NFW(r_array) + psi_proto_poly(r_array)
     
     T_orb_grid = 0.0*f_grid
     for i, E in enumerate(tqdm(E_grid[:,0])):
@@ -304,7 +328,7 @@ if ((FROM_SCRATCH) or (not os.path.isfile("f_grid.npy"))):
             
             if ((np.sum(inds) > 0) and (np.sum(inds) < 100)):
                 _r = np.geomspace(np.min(r_array[inds]), np.max(r_array[inds]), 250)
-                _psi_new = psi_NFW(_r) + psi_SMS_bloated(_r)
+                _psi_new = psi_NFW(_r) + psi_proto_poly(_r)
                 vr_sq_grid = 2*_psi_new - 2*E - L**2/_r**2
                 inds = vr_sq_grid > 0
             
@@ -345,9 +369,9 @@ def log_sampler(x_min, x_max, N):
 #Sampling E, L points
 #--------------------
 
-Lmin = 1e-6
+Lmin = 1e-8
 
-E_samps = log_sampler(np.min(E_grid[:,0]), np.max(E_grid[:,0]), N_particles)
+E_samps = lin_sampler(np.min(E_grid[:,0]), np.max(E_grid[:,0]), N_particles)
 L_samps = log_sampler(Lmin, np.max(L_grid[0,:]), N_particles)
 
 deltaE = np.max(E_grid[:,0]) - np.min(E_grid[:,0])
@@ -356,25 +380,33 @@ deltaL = np.max(L_grid[0,:]) - Lmin
 deltalogE = np.log(np.max(E_grid[:,0])) - np.log(np.min(E_grid[:,0]))
 deltalogL = np.log(np.max(L_grid[0,:])) - np.log(Lmin)
 
-_psi = psi_NFW(r_array) + psi_SMS_bloated(r_array)
+_psi = psi_NFW(r_array) + psi_proto_poly(r_array)
 
+print("Shapes")
+print(E_grid.shape)
+print(L_grid.shape)
+print(T_orb_grid.shape)
+print(f_grid.shape)
 
 points = (E_grid[:,0], L_grid[0,:])
-new_points = np.array((E_samps, L_samps)).T
+#new_points = np.array((E_samps, L_samps)).T
+new_points = (E_samps, L_samps)
 
 
-f_E_L = interpn(points, (4*np.pi)**2*(L_grid*T_orb_grid)*f_grid, new_points, bounds_error=False, fill_value=0.0)
+print("Running interpn")
 
+f_E_L = interpn(points,  (4*np.pi)**2*(L_grid*T_orb_grid)*f_grid, new_points, bounds_error=False, fill_value=0.0)
 
-p_samps = 1/(E_samps*L_samps)
+p_samps = 1/(L_samps)
+#p_samps = 1/(E_samps*L_samps)
 #p_samps = 1.0
 weights = (1/p_samps)*f_E_L
 
-Vol = deltalogE*deltalogL
+Vol = deltaE*deltalogL
 
 print("Total:", Vol*np.sum(weights)/N_particles/M_halo)
 
-_psi = psi_NFW(r_array) + psi_SMS_bloated(r_array)
+_psi = psi_NFW(r_array) + psi_proto_poly(r_array)
 
 # Reconstructing Density Profile
 #-------------------------------
@@ -392,7 +424,7 @@ for i in tqdm(range(N_particles),desc="Calculating density profile"):
         
         if ((np.sum(inds) > 0) and (np.sum(inds) < 100)):
             _r = np.geomspace(np.min(r_array[inds]), np.max(r_array[inds]), 250)
-            _psi_new = psi_NFW(_r) + psi_SMS_bloated(_r)
+            _psi_new = psi_NFW(_r) + psi_proto_poly(_r)
             vr_sq_grid = 2*_psi_new - 2*E - L**2/_r**2
             inds = vr_sq_grid > 0
         
@@ -416,13 +448,12 @@ for i in tqdm(range(N_particles),desc="Calculating density profile"):
 rho_r_A = P_r_A/(4*np.pi*r_array**2)
 
 
-
 #Sampling r-positions
 #--------------------
 
 r_samps = 0.0*E_samps
 
-psi_fun = lambda x: psi_NFW(x) + psi_SMS_bloated(x)
+psi_fun = lambda x: psi_NFW(x) + psi_proto_poly(x)
 for i in tqdm(range(N_particles)):
     found = False
     if (weights[i] < 1e-20):
@@ -461,7 +492,7 @@ for i in tqdm(range(N_particles)):
 #Instantaneous BH formation
 #--------------------------
 
-E_f_samps = E_samps - psi_SMS_bloated(r_samps) + psi_BH(r_samps)
+E_f_samps = E_samps - psi_proto_poly(r_samps) + psi_BH(r_samps)
 
 _psi = psi_NFW(r_array) + psi_BH(r_array)
 
@@ -523,8 +554,7 @@ plt.loglog(r_array, rho_initial, c = rgb_palette_dict['dark sienna'], label = 'N
 #plt.loglog(r_array, rho_GS_no_r_S, c = rgb_palette_dict['amber'], label = r'GS, $m_{BH} = 10^5 M\odot$') #density_GS_pred
 # plt.loglog(r_array, rho_after_proto, c = rgb_palette_dict['purple pizzazz'], label = 'after isothermal collapse')
 plt.loglog(r_array, rho_array, c = rgb_palette_dict['flickr pink'], label = 'After SMS formation')
-
-
+plt.loglog(r_array, rho_GS_array, c = rgb_palette_dict['amber'], label = 'GS profile')
 #plt.loglog(r_array, rho_r,c='C1', linestyle=':')
 plt.loglog(r_array, rho_r_A,c='C2', linestyle='--', label="After SMS formation (sampled)")
 plt.loglog(r_array, rho_r_B,c='C3', linestyle=':',lw=2, label="After DCBH formation (all)")
@@ -533,7 +563,6 @@ plt.axvline(r_core, c = rgb_palette_dict['turquiose'], ls = '--')
 plt.axvline(2*r_S, c = 'k', ls = '--')
 plt.axvline(3*r_S, c = 'k', ls = '--')
 plt.axvline(4*r_S, c = 'k', ls = '--')
-
 plt.ylim(1E0, 1E25)
 plt.xlim(1E-9, 1E3)
 plt.legend()
@@ -541,23 +570,28 @@ plt.ylabel(r'$\rho$ [$M_\odot$pc$^{-3}$]')
 plt.xlabel(r'$r$ (pc)')
 plt.savefig('./figures/density_NFW_rho_SMS.pdf')
 
+
 plt.figure(figsize=(6,6))
 
-plt.loglog(r_array, rho_initial, c = rgb_palette_dict['dark sienna'], label = 'Initial NFW')
+#plt.loglog(r_array, rho_initial, c = rgb_palette_dict['dark sienna'], label = 'Initial NFW')
+plt.loglog(r_array, rho_GS_array, c = rgb_palette_dict['amber'], label = 'GS Profile')
 #plt.loglog(r_array, rho_GS_no_r_S, c = rgb_palette_dict['amber'], label = r'GS, $m_{BH} = 10^5 M\odot$') #density_GS_pred
 # plt.loglog(r_array, rho_after_proto, c = rgb_palette_dict['purple pizzazz'], label = 'after isothermal collapse')
 plt.loglog(r_array, rho_array, c = rgb_palette_dict['flickr pink'], label = 'After SMS formation')
-
 #plt.loglog(r_array, rho_r,c='C1', linestyle=':')
 #plt.loglog(r_array, rho_r_A,c='C2', linestyle='--', label="After SMS formation (sampled)")
 #plt.loglog(r_array, rho_r_B,c='C3', linestyle=':',lw=2, label="After DCBH formation (all)")
 plt.loglog(r_array, rho_r_C, c=rgb_palette_dict['dark goldenrod'], linestyle='-',lw=2, label="After DCBH formation")
 #plt.axvline(r_core, c = rgb_palette_dict['turquiose'], ls = '--')
 plt.axvline(2*r_S, c = 'k', ls = '--')
+plt.axvline(r_poly, c = 'k', ls = '--')
+
+plt.text(1.4*r_S, 8e19, r"$2 r_\mathrm{s}$", rotation=90)
+plt.text(0.7*r_poly, 8e19, r"$r_\mathrm{SMS}$", rotation=90)
 #plt.axvline(3*r_S, c = 'k', ls = '--')
 #plt.axvline(4*r_S, c = 'k', ls = '--')
 
-plt.ylim(1E15, 1E22)
+plt.ylim(1E14, 1E21)
 plt.xlim(1E-8, 1E-5)
 plt.legend()
 plt.ylabel(r'$\rho_\mathrm{DM}$ [$M_\odot$pc$^{-3}$]')
