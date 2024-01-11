@@ -37,7 +37,7 @@ reload(sys.modules['evolving_densities'])
 from evolving_densities import Density
 
 plt.rcParams.update({
-    "text.usetex": True
+    "text.usetex": False
 })
 
 #%%
@@ -102,7 +102,7 @@ def rho_NFW(r):
 
 #Number of particles in the sample
 #---------------------------------
-N_particles = int(1e6)
+N_particles = int(1e5)
 
 
 #Calculate adiabatic phase-space from scratch
@@ -572,29 +572,41 @@ plt.savefig('./figures/density_NFW_rho_SMS.pdf')
 
 
 plt.figure(figsize=(6,6))
-
-#plt.loglog(r_array, rho_initial, c = rgb_palette_dict['dark sienna'], label = 'Initial NFW')
+#fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 9))
 plt.loglog(r_array, rho_GS_array, c = rgb_palette_dict['amber'], label = 'GS Profile')
-#plt.loglog(r_array, rho_GS_no_r_S, c = rgb_palette_dict['amber'], label = r'GS, $m_{BH} = 10^5 M\odot$') #density_GS_pred
-# plt.loglog(r_array, rho_after_proto, c = rgb_palette_dict['purple pizzazz'], label = 'after isothermal collapse')
 plt.loglog(r_array, rho_array, c = rgb_palette_dict['flickr pink'], label = 'After SMS formation')
-#plt.loglog(r_array, rho_r,c='C1', linestyle=':')
-#plt.loglog(r_array, rho_r_A,c='C2', linestyle='--', label="After SMS formation (sampled)")
-#plt.loglog(r_array, rho_r_B,c='C3', linestyle=':',lw=2, label="After DCBH formation (all)")
 plt.loglog(r_array, rho_r_C, c=rgb_palette_dict['dark goldenrod'], linestyle='-',lw=2, label="After DCBH formation")
-#plt.axvline(r_core, c = rgb_palette_dict['turquiose'], ls = '--')
 plt.axvline(2*r_S, c = 'k', ls = '--')
 plt.axvline(r_poly, c = 'k', ls = '--')
-
 plt.text(1.4*r_S, 8e19, r"$2 r_\mathrm{s}$", rotation=90)
 plt.text(0.7*r_poly, 8e19, r"$r_\mathrm{SMS}$", rotation=90)
-#plt.axvline(3*r_S, c = 'k', ls = '--')
-#plt.axvline(4*r_S, c = 'k', ls = '--')
-
 plt.ylim(1E14, 1E21)
 plt.xlim(1E-8, 1E-5)
 plt.legend()
 plt.ylabel(r'$\rho_\mathrm{DM}$ [$M_\odot$pc$^{-3}$]')
 plt.xlabel(r'$r$ [pc]')
 plt.savefig('./figures/density_NFW_rho_SMS_zoom.pdf')
+plt.show()
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 9))
+ax1.loglog(r_array, rho_GS_array, c = rgb_palette_dict['amber'], label = 'GS Profile')
+ax1.loglog(r_array, rho_array, c = rgb_palette_dict['flickr pink'], label = 'After SMS formation')
+ax1.loglog(r_array, rho_r_C, c=rgb_palette_dict['dark goldenrod'], linestyle='-',lw=2, label="After DCBH formation")
+ax1.axvline(2*r_S, c = 'k', ls = '--')
+ax1.axvline(r_poly, c = 'k', ls = '--')
+ax1.text(1.4*r_S, 8e19, r"$2 r_\mathrm{s}$", rotation=90)
+ax1.text(0.7*r_poly, 8e19, r"$r_\mathrm{SMS}$", rotation=90)
+ax1.set_ylim(1E14, 1E21)
+ax1.set_xlim(1E-8, 1E-5)
+ax1.legend()
+ax1.set_ylabel(r'$\rho_\mathrm{DM}$ [$M_\odot$pc$^{-3}$]')
+ax1.set_xlabel(r'$r$ [pc]')
+slope_1 = np.gradient(np.log(rho_array), np.log(r_array))
+slope_2 = np.gradient(np.log(rho_r_C), np.log(r_array))
+ax2.plot(r_array, np.log(slope_1), c = rgb_palette_dict['flickr pink'])
+ax2.plot(r_array, np.log(slope_2), c = rgb_palette_dict['dark goldenrod'], linestyle='-',lw=2)
+ax2.set_ylabel("Log Slope")
+ax2.set_xlim(1E-8, 1E-5)
+plt.tight_layout()
+plt.savefig('./figures/density_NFW_rho_SMS_zoom_2.pdf')
 plt.show()
