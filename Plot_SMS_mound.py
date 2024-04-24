@@ -42,7 +42,7 @@ reload(sys.modules['evolving_densities'])
 from evolving_densities import Density
 
 plt.rcParams.update({
-    "text.usetex": True
+    "text.usetex": False
 })
 
 #%%
@@ -111,6 +111,7 @@ def rho_NFW(r):
 #Number of particles in the sample
 #---------------------------------
 N_particles = int(5e6)
+
 
 #N1 is the number of particles in the linear sampling...
 N1 = int(N_particles-1)
@@ -302,19 +303,21 @@ plt.savefig('./figures/density_NFW_gas_star_potentials.pdf')
 
 gamma_PL = 1.
 r_0   = R_s
-rho_0 = rho_0_prime/4.
+#rho_0 = rho_0_prime/4.
+rho_0 = 1.0*rho_0_prime
 gamma_sp_GS = (9. - 2.*gamma_PL)/(4. - gamma_PL)
 
-alpha_gamma = 0.293 * (gamma_PL)**(4./9.)
+#alpha_gamma = 0.293 * (gamma_PL)**(4./9.)
+alpha_gamma = 0.135
 
 def g_GS(r, m_BH, k):
-    r_S = 2*G_N*m_BH/c_light**2
+    r_S = 4*G_N*m_BH/c_light**2
     return np.clip((1. - 2.*r_S/r), 0, None)**k
 
-print(">------- NOTE THAT WE'RE USING A FACTOR OF 2 TO FUDGE THE RESULTS: CHECK WHERE IT COMES FROM!")
+#print(">------- NOTE THAT WE'RE USING A FACTOR OF 2 TO FUDGE THE RESULTS: CHECK WHERE IT COMES FROM!")
 def rho_GS(r, m_BH, k):
     r_sp_GS = alpha_gamma * r_0 * (m_BH / (rho_0 * r_0**3.))**(1./(3. - gamma_PL))
-    rho_R = 0.5*rho_0*(r_sp_GS/r_0)**(-gamma_PL)
+    rho_R = rho_0*(r_sp_GS/r_0)**(-gamma_PL)#0.5*
     return rho_0_prime * (R_s/r) / (1 + r/R_s)**2 * np.exp(-r/R_vir) + g_GS(r, m_BH, k) * rho_R*(r_sp_GS/r)**(gamma_sp_GS)
 
 
@@ -922,26 +925,15 @@ plt.savefig('./figures/density_NFW_rho_SMS_v2.pdf')
 
 
 plt.figure(figsize=(6,6))
-
-#plt.loglog(r_array, rho_initial, c = rgb_palette_dict['dark sienna'], label = 'Initial NFW')
+#fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 9))
 plt.loglog(r_array, rho_GS_array, c = rgb_palette_dict['amber'], label = 'GS Profile')
-#plt.loglog(r_array, rho_GS_no_r_S, c = rgb_palette_dict['amber'], label = r'GS, $m_{BH} = 10^5 M\odot$') #density_GS_pred
-# plt.loglog(r_array, rho_after_proto, c = rgb_palette_dict['purple pizzazz'], label = 'after isothermal collapse')
 plt.loglog(r_array, rho_array, c = rgb_palette_dict['flickr pink'], label = 'After SMS formation')
-#plt.loglog(r_array, rho_r,c='C1', linestyle=':')
-#plt.loglog(r_array, rho_r_A,c='C2', linestyle='--', label="After SMS formation (sampled)")
-#plt.loglog(r_array, rho_r_B,c='C3', linestyle=':',lw=2, label="After DCBH formation (all)")
 plt.loglog(r_array, rho_r_C, c=rgb_palette_dict['dark goldenrod'], linestyle='-',lw=2, label="After DCBH formation")
-#plt.loglog(r_array, rho_r_E, c=rgb_palette_dict['purple pizzazz'], linestyle='-',lw=2, label="After final regrowth")
-#plt.axvline(r_core, c = rgb_palette_dict['turquiose'], ls = '--')
+
 plt.axvline(2*r_S, c = 'k', ls = '--')
 plt.axvline(r_poly, c = 'k', ls = '--')
-
 plt.text(1.4*r_S, 8e19, r"$2 r_\mathrm{s}$", rotation=90)
 plt.text(0.7*r_poly, 8e19, r"$r_\mathrm{SMS}$", rotation=90)
-#plt.axvline(3*r_S, c = 'k', ls = '--')
-#plt.axvline(4*r_S, c = 'k', ls = '--')
-
 plt.ylim(1E14, 1E21)
 plt.xlim(1E-8, 1E-5)
 plt.legend(loc='best')
@@ -983,5 +975,29 @@ plt.legend()
 plt.ylabel(r'$\rho_\mathrm{DM}$ [$M_\odot \, \mathrm{pc}^{-3}$]')
 plt.xlabel(r'$r$ [pc]')
 plt.savefig('./figures/density_final_v1.pdf')
+plt.show()
+
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 9))
+ax1.loglog(r_array, rho_GS_array, c = rgb_palette_dict['amber'], label = 'GS Profile')
+ax1.loglog(r_array, rho_array, c = rgb_palette_dict['flickr pink'], label = 'After SMS formation')
+ax1.loglog(r_array, rho_r_C, c=rgb_palette_dict['dark goldenrod'], linestyle='-',lw=2, label="After DCBH formation")
+ax1.axvline(2*r_S, c = 'k', ls = '--')
+ax1.axvline(r_poly, c = 'k', ls = '--')
+ax1.text(1.4*r_S, 8e19, r"$2 r_\mathrm{s}$", rotation=90)
+ax1.text(0.7*r_poly, 8e19, r"$r_\mathrm{SMS}$", rotation=90)
+ax1.set_ylim(1E14, 1E21)
+ax1.set_xlim(1E-8, 1E-5)
+ax1.legend()
+ax1.set_ylabel(r'$\rho_\mathrm{DM}$ [$M_\odot$pc$^{-3}$]')
+ax1.set_xlabel(r'$r$ [pc]')
+slope_1 = np.gradient(np.log(rho_array), np.log(r_array))
+slope_2 = np.gradient(np.log(rho_r_C), np.log(r_array))
+ax2.plot(r_array, np.log(slope_1), c = rgb_palette_dict['flickr pink'])
+ax2.plot(r_array, np.log(slope_2), c = rgb_palette_dict['dark goldenrod'], linestyle='-',lw=2)
+ax2.set_ylabel("Log Slope")
+ax2.set_xlim(1E-8, 1E-5)
+plt.tight_layout()
+plt.savefig('./figures/density_NFW_rho_SMS_zoom_2.pdf')
 plt.show()
 
