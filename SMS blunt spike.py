@@ -4,7 +4,7 @@ import numpy as np
 
 from copy import copy
 import os
-os.chdir('/Users/daniele/Dropbox/Fisica/2023/EvolvingDensities-main/')
+#os.chdir('/Users/daniele/Dropbox/Fisica/2023/EvolvingDensities-main/')
 
 from scipy.interpolate import interp1d, UnivariateSpline
 from matplotlib.colors import LogNorm, Normalize
@@ -37,7 +37,8 @@ from evolving_densities import Density
 G_N = 4.302e-3 #Units of (pc/solar mass) (km/s)^2
 c_light = 2.9979e05 #km/s
 
-r_array = np.logspace(-10, 3, num = 1301)
+#r_array = np.logspace(-10, 3, num = 1301)
+r_array = np.logspace(-10, 3, num = 651)
 
 M_halo = 2E8
 z = 20
@@ -71,7 +72,8 @@ plt.ylim(bottom = 1E-4)
 
 #%%
 
-rho_M_data = np.genfromtxt('/Users/daniele/Dropbox/Fisica/2023/EvolvingDensities-main/rho_M.csv', delimiter = ',')
+#rho_M_data = np.genfromtxt('/Users/daniele/Dropbox/Fisica/2023/EvolvingDensities-main/rho_M.csv', delimiter = ',')
+rho_M_data = np.genfromtxt('rho_M.csv', delimiter = ',')
 
 logrho_M_interp = interp1d(rho_M_data[:, 0], np.log10(rho_M_data[:, 1]), kind = 'quadratic', bounds_error = False,
                            fill_value = (np.log10(rho_M_data[0, 1]), 0))
@@ -96,7 +98,7 @@ for i in range(len(x_test) - 1):
 
     r_reconstructed.append(r + dr)
 
-    if i%100 == 0: print(r_reconstructed[-1], dr)
+    #if i%100 == 0: print(r_reconstructed[-1], dr)
 
 r_reconstructed = np.array(r_reconstructed)
 
@@ -131,7 +133,8 @@ plt.legend()
 
 print("Creating Density objects")
 
-density_NFW = Density('density_NFW_SMS', rho_NFW, r_array, N_particles = int(3E5))
+N_part = int(1e2) #
+density_NFW = Density('density_NFW_SMS', rho_NFW, r_array, N_particles = N_part)
 density_NFW.setup_potentials()
 psi_NFW = density_NFW.get_psi()
 M_tot_NFW = density_NFW.M_enclosed(r_array[-1])
@@ -168,7 +171,7 @@ psi_proto_poly = density_proto_poly.get_psi()
 M_tot_proto_poly = density_proto_poly.M_enclosed(r_array[-1])
 
 density_SMS_bloated = Density('density_SMS_bloated', rho_SMS_bloated_interp, r_array, N_particles = int(5E0))
-density_SMS_bloated.smoothen_density()
+#density_SMS_bloated.smoothen_density()
 density_SMS_bloated.setup_potentials()
 psi_SMS_bloated = density_SMS_bloated.get_psi()
 M_tot_SMS_bloated = density_SMS_bloated.M_enclosed(r_array[-1])
@@ -202,8 +205,11 @@ print("Calling Adiabatic Growth...")
 #######################################################################################################################
 #######################################################################################################################
 #######################################################################################################################
-density_GS_pred_no_r_S = density_NFW.adiabatic_growth(psi_BH, r_S = 0, refinement = 15, figures = False)
-density_GS_pred = density_NFW.adiabatic_growth(psi_BH, r_S = r_S, refinement = 15, figures = False)
+REFINE = 15
+
+"""
+density_GS_pred_no_r_S = density_NFW.adiabatic_growth(psi_BH, r_S = 0, refinement = REFINE, figures = False)
+density_GS_pred = density_NFW.adiabatic_growth(psi_BH, r_S = r_S, refinement = REFINE, figures = False)
 #######################################################################################################################
 #######################################################################################################################
 #######################################################################################################################
@@ -220,9 +226,10 @@ rho_mask = np.logical_and(rho_GS > 0, r_array > 4*r_S)
 rho_GS_smooth = smooth_Bspline(r_array[rho_mask], rho_GS[rho_mask], increasing = False)
 logrho_GS_spline = UnivariateSpline(np.log(r_array[rho_mask]), np.log(rho_GS_smooth(r_array)[rho_mask]), k = 2, s = 0)
 dlogrho_GS = logrho_GS_spline.derivative(n = 1)
-
+"""
 #%%
 
+"""
 density_NFW.calculate_orbital_time_distribution()
 
 #%%
@@ -251,6 +258,7 @@ plt.colorbar()
 plt.savefig('./figures/density_NFW_hist_ri_Tr.pdf')
 #plt.show()
 
+
 #%%
 mask = T_r_samples > 2
 p_r_large_T, edges = np.histogram(r_i_samples[mask], bins = r_array[::10], density = True, weights = weight_samples[mask])
@@ -269,7 +277,7 @@ plt.savefig('./figures/density_NFW_fraction_large_T.pdf')
 
 ind_sp = np.argmin(np.abs(r_array[5::10] - r_sp))
 print(rho_large_T[ind_sp]/rho_tot[ind_sp])
-
+"""
 #%%
 
 # density_after_proto_collapse = density_NFW.non_adiabatic_growth(psi_proto_poly, logr = True, figures = True)
@@ -407,10 +415,10 @@ density_after_SMS = density_NFW.adiabatic_growth(psi_SMS_bloated, refinement = 1
 #######################################################################################################################
 #######################################################################################################################
 #%%
-
+W
 plt.figure()
 plt.loglog(r_array, rho_initial, c = rgb_palette_dict['dark sienna'], label = 'NFW')
-plt.loglog(r_array, rho_GS_no_r_S, c = rgb_palette_dict['amber'], label = r'GS, $m_{BH} = 10^5 M\odot$')
+#plt.loglog(r_array, rho_GS_no_r_S, c = rgb_palette_dict['amber'], label = r'GS, $m_{BH} = 10^5 M\odot$') #density_GS_pred
 # plt.loglog(r_array, rho_after_proto, c = rgb_palette_dict['purple pizzazz'], label = 'after isothermal collapse')
 plt.loglog(r_array, density_after_SMS(r_array), c = rgb_palette_dict['flickr pink'], label = 'after SMS formation')
 plt.axvline(r_core, c = rgb_palette_dict['turquiose'], ls = '--')
@@ -424,6 +432,7 @@ plt.savefig('./figures/density_NFW_rho_SMS.pdf')
 
 #%%
 
+print("---Got to here (1)---")
 rho_after_SMS = density_after_SMS(r_array)
 rho_mask = rho_after_SMS > 0
 rho_after_SMS_smooth = smooth_Bspline(r_array[rho_mask], rho_after_SMS[rho_mask], increasing = False)
@@ -444,17 +453,25 @@ plt.legend()
 plt.ylabel(r'd log$(\rho)$/d log($r$)')
 plt.xlabel(r'$r$ (pc)')
 plt.savefig('./figures/density_NFW_dlogrho_SMS.pdf')
-plt.figure()
+#plt.figure()
 
 #%%
 
-density_after_SMS.smoothen_density()
+assert(False)
+
+print("---Got to here (2)---")
+
+print("A")
+#density_after_SMS.smoothen_density()
+print("B")
 density_after_SMS.setup_potentials()
+print("C")
 density_after_SMS.add_external_potential_from_other(density_SMS_bloated)
+print("D")
 density_after_SMS.setup_phase_space(smoothen = True)
 
 #%%
-
+print("---Got to here (3)---")
 delta_psi = lambda r: psi_BH(r) - psi_SMS_bloated(r)
 print("Direct Collapse")
 print("Calling Non-Adiabatic Growth...")
@@ -556,7 +573,7 @@ plt.xscale('log')
 plt.yscale('log')
 plt.xlabel('$r_i$ (pc)')
 plt.ylabel('$r$ (pc)')
-plt.colorbar(label  = r'$p(r_i | r)$', location = 'top',
+plt.colorbar(label  = r'$p(r_i | r)$', #location = 'top',
              fraction = 0.05, pad = 0)
 plt.savefig('./figures/density_NFW_p_ri_r.pdf')
 #plt.show()

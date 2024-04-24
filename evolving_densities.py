@@ -1571,3 +1571,8 @@ class Density:
             return Density(self._name+'adiabatic', rho_final, r_array, self._N), Ev_final, Lv_final, phase_space
         else:
             return Density(self._name+'adiabatic', rho_final, r_array, self._N)
+            
+
+    def calc_final_energy(self, E_i, L_i, psi_func, M_BH):
+        I_i = self.radial_action(E_i, L_i, psi_func)
+        return 0.5*((G_N*M_BH)/(I_i/(2*np.pi)  + L_i))**2
