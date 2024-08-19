@@ -56,6 +56,8 @@ r_array = np.geomspace(1e-10, 1e0, num = int(1301))
 
 print("Check with different r_array from the start! Check with more particles!")
 
+print("***************************** CHECK DEFINITION OF SCHWARZSCHILD RADIUS *********************************")
+
 h = 0.678
 Omega_DM = 0.1186/(h**2)
 H0 = 100.0*h #(km/s) Mpc^-1
@@ -261,7 +263,7 @@ def psi_BH(r):
 #r_S_final = 2*G_N*m_BH_final/c_light**2
 
 
-
+print("CUT OFF ")
 
 #r_sp = 0.122 * R_s * ( m_BH / ( rho_0_prime * R_s**3 ) )**(1./(3.-1))
 
@@ -275,8 +277,8 @@ gamma_sp_GS = (9. - 2.*gamma_PL)/(4. - gamma_PL)
 alpha_gamma = 0.135
 
 def g_GS(r, m_BH, k):
-    r_S = 4*G_N*m_BH/c_light**2
-    return np.clip((1. - 2.*r_S/r), 0, None)**k
+    r_S = 2*G_N*m_BH/c_light**2
+    return np.clip((1. - 4.*r_S/r), 0, None)**k
 
 #print(">------- NOTE THAT WE'RE USING A FACTOR OF 2 TO FUDGE THE RESULTS: CHECK WHERE IT COMES FROM!")
 def rho_GS(r, m_BH, k):
