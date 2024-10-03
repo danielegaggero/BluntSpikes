@@ -276,15 +276,15 @@ gamma_sp_GS = (9. - 2.*gamma_PL)/(4. - gamma_PL)
 #alpha_gamma = 0.293 * (gamma_PL)**(4./9.)
 alpha_gamma = 0.135
 
-def g_GS(r, m_BH, k):
+def g_GS(r, m_BH, k, fact = 1.0):
     r_S = 2*G_N*m_BH/c_light**2
-    return np.clip((1. - 4.*r_S/r), 0, None)**k
+    return np.clip((1. - fact*2.*r_S/r), 0, None)**k
 
 #print(">------- NOTE THAT WE'RE USING A FACTOR OF 2 TO FUDGE THE RESULTS: CHECK WHERE IT COMES FROM!")
-def rho_GS(r, m_BH, k):
+def rho_GS(r, m_BH, k, fact = 1.0):
     r_sp_GS = alpha_gamma * r_0 * (m_BH / (rho_0 * r_0**3.))**(1./(3. - gamma_PL))
     rho_R = rho_0*(r_sp_GS/r_0)**(-gamma_PL)#0.5*
-    return rho_0_prime * (R_s/r) / (1 + r/R_s)**2 * np.exp(-r/R_vir) + g_GS(r, m_BH, k) * rho_R*(r_sp_GS/r)**(gamma_sp_GS)
+    return rho_0_prime * (R_s/r) / (1 + r/R_s)**2 * np.exp(-r/R_vir) + g_GS(r, m_BH, k, fact) * rho_R*(r_sp_GS/r)**(gamma_sp_GS)
 
 
 print(m_BH)
@@ -295,8 +295,8 @@ rho_r_C = np.loadtxt("results/rho_DCBH.txt", unpack=True, usecols=(1,))
 
 
 rho_r_2 = np.loadtxt("results/rho_regrowth_2.txt", unpack=True, usecols=(1,))
-rho_r_3 = np.loadtxt("results/rho_regrowth_3.txt", unpack=True, usecols=(1,))
-rho_r_5 = np.loadtxt("results/rho_regrowth_5.txt", unpack=True, usecols=(1,))
+#rho_r_3 = np.loadtxt("results/rho_regrowth_3.txt", unpack=True, usecols=(1,))
+#rho_r_5 = np.loadtxt("results/rho_regrowth_5.txt", unpack=True, usecols=(1,))
 rho_r_10 = np.loadtxt("results/rho_regrowth_10.txt", unpack=True, usecols=(1,))
 
 
@@ -315,7 +315,7 @@ plt.figure(figsize=(5.5,5.5))
 #plt.loglog(r_array, rho_r_A,c='C2', linestyle='--', label="After SMS formation (sampled)")
 #plt.loglog(r_array, rho_r_B,c='C3', linestyle=':',lw=2, label="After DCBH formation (all)")
 plt.loglog(r_array, rho_r_C, c='blue', linestyle='-',lw=2, label=r"After DCBH formation, $m_\mathrm{BH} = 10^5\,M_\odot$")
-rho_GS_array = rho_GS(r_array, m_BH*2, k=3.00)
+rho_GS_array = rho_GS(r_array, m_BH*2, k=2.50)
 plt.loglog(r_array, rho_GS_array, c='plum', linestyle='--',lw=1.5)#, label=r"After BH growth ($m_\mathrm{BH} = 10^6\,M_\odot$)")
 plt.loglog(r_array, rho_r_2,  c='plum', linestyle='-',lw=2, label=r"Subsequent growth to $m_\mathrm{BH} = 2 \times 10^5\,M_\odot$")
 #, label=r"Subsequent growth ($m_\mathrm{BH} = 2\times 10^5\,M_\odot$)")#, label=r"After BH growth ($m_\mathrm{BH} = 10^6\,M_\odot$)")
@@ -326,7 +326,7 @@ plt.loglog(r_array, rho_r_2,  c='plum', linestyle='-',lw=2, label=r"Subsequent g
 #plt.loglog(r_array, rho_GS_array, c='royalblue', linestyle='--',lw=2)#, label=r"After BH growth ($m_\mathrm{BH} = 10^6\,M_\odot$)")
 #plt.loglog(r_array, rho_r_5,  c='royalblue', linestyle='-',lw=2)#, label=r"After BH growth ($m_\mathrm{BH} = 10^6\,M_\odot$)")
 
-rho_GS_array = rho_GS(r_array, m_BH*10, k=3.00)
+rho_GS_array = rho_GS(r_array, m_BH*10, k=2.50)
 plt.loglog(r_array, rho_GS_array, c='darkmagenta', linestyle='--',lw=1.5)#, label=r"After BH growth ($m_\mathrm{BH} = 10^6\,M_\odot$)")
 plt.loglog(r_array, rho_r_10, c='darkmagenta', linestyle='-',lw=2, label=r"Subsequent growth to $m_\mathrm{BH} = 10^6\,M_\odot$")
 #, label=r"Subsequent growth ($m_\mathrm{BH} = 10^6\,M_\odot$)")#, label=r"After BH growth ($m_\mathrm{BH} = 10^6\,M_\odot$)")

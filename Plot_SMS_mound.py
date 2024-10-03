@@ -42,7 +42,7 @@ reload(sys.modules['evolving_densities'])
 from evolving_densities import Density
 
 plt.rcParams.update({
-    "text.usetex": False
+    "text.usetex": True
 })
 
 #%%
@@ -110,8 +110,7 @@ def rho_NFW(r):
 
 #Number of particles in the sample
 #---------------------------------
-#N_particles = int(5e6)
-N_particles = int(1e6)
+N_particles = int(1e5)
 
 
 #Calculate adiabatic phase-space from scratch
@@ -682,7 +681,8 @@ def adiabatic_regrowth(m_BH_final):
     
     return rho_r_D, rho_r_E
 
-growth_factor = [2, 5, 10, 3]
+#growth_factor = [2, 5, 10, 3]
+growth_factor = [2, 10,]
 for g in growth_factor:
     
     rho_r_D, rho_r_E = adiabatic_regrowth(m_BH*g)
